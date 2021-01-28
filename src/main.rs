@@ -28,11 +28,11 @@ const _POSITION_OOB_TOLERANCE: f64 = 100.0*_NUMBER_DCS as f64;
 const MINIMUM_CONTACT_GRID_MEMORY_REDUCTION_FACTOR: f64 = 0.25;
 const _TIME_TOLERANCE: f64 = 1e-6;
 
-const NUM_REPEATS: u16 = 2;
+const NUM_REPEATS: u16 = 20;
 const DEFAULT_TIMESTEP: f64 = 0.05;
 const NUM_TIME_MEASUREMENTS: u32 = 500;
 const NUM_TIMESTEPS_2DAY: f64 = 2880.0 / DEFAULT_TIMESTEP;
-const NUM_TIMESTEPS_7DAY: f64 = 7.0 * 1440.0 / DEFAULT_TIMESTEP;
+const NUM_TIMESTEPS_28DAY: f64 = 28.0 * 1440.0 / DEFAULT_TIMESTEP;
 
 // cross-presentation parameters
 
@@ -48,7 +48,7 @@ fn main() {
     let t_free_path: f64 = args[6].parse().unwrap();
     let t_act_threshold: f64 = args[7].parse().unwrap();
 
-    return simulation(NUM_TIMESTEPS_7DAY.round() as u32, DEFAULT_TIMESTEP, dc_flux, DEFAULT_RADIUS, contact_radius_sq.sqrt(), TOTAL_TNUM.round() as u32, ag_on_arrival, off_rate, t_cell_velocity, t_free_path, t_act_threshold.round() as u32)
+    return simulation(NUM_TIMESTEPS_28DAY.round() as u32, DEFAULT_TIMESTEP, dc_flux, DEFAULT_RADIUS, contact_radius_sq.sqrt(), TOTAL_TNUM.round() as u32, ag_on_arrival, off_rate, t_cell_velocity, t_free_path, t_act_threshold.round() as u32)
 }
 
 fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, contact_radius: f64, num_t_cells: u32, ag_on_arrival:f64, off_rate:f64, t_cell_velocity:f64, t_free_path:f64, t_act_threshold:u32) {
@@ -158,7 +158,7 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
             // }
 
             // spawning function for flux model
-            while t as f64*time_step*dc_flux >= (d_cells_present % num_d_cells + 1) as f64 { // we haven't got as many DCs as we should, better add one   
+            while t as f64*time_step*dc_flux >= d_cells_present as f64 { // we haven't got as many DCs as we should, better add one   
             let dloc = d_cells_present % num_d_cells; // dloc is the position in the d_cell_list we will be adding/removing
             if d_cells_present > num_d_cells {
                 functions::functions::remove_dc_from_discrete_grid(d_cell_list[dloc as usize].x, d_cell_list[dloc as usize].y, d_cell_list[dloc as usize].z, dloc, radius, cell_side, &mut occupied_positions, num_positions); // get rid of old DC that was here!
@@ -267,7 +267,7 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
         //println!("{}, {}", this_num_interactions, this_num_activated);
     } // end of repeat loop
     println!("{}    {}", total_num_interactions, total_num_activated);
-    println!("Total number of activations: {}", total_num_activated);
+    //println!("Total number of activations: {}", total_num_activated);
 } // end of function
 // working perfectly with gaussian velocities as of 28/1/21
 
