@@ -1,5 +1,6 @@
 mod functions;
 use rand::Rng;
+use std::env;
 
 // Declaring the constants for the LN model in the global scope. Defining as floats will help with SA later on
 const DEFAULT_RADIUS: f64 = 500.0;
@@ -19,7 +20,7 @@ const TCELL_ACTIVATION_THRESHOLD: u32 = 20;
 const FIRST_DC_ARRIVAL: f64 = 1080.0;
 const DC_ARRIVAL_DURATION: f64 = 5.0;//360.0;
 const _NUMBER_DCS: u32 = 720;
-const DC_FLUX: f64 = 0.1; // per minute
+const DC_FLUX: f64 = 0.03333; // per minute
 const DEFAULT_ANTIGEN_DECAY_RATE: f64 = 0.001;
 const DEFAULT_COGNATE_RATIO_MEAN_AT_DERMIS: f64 = 0.2;
 const _ANTIGEN_OOB_TOLERANCE: f64 = 0.1*_NUMBER_DCS as f64;
@@ -31,23 +32,33 @@ const NUM_REPEATS: u16 = 2;
 const DEFAULT_TIMESTEP: f64 = 0.05;
 const NUM_TIME_MEASUREMENTS: u32 = 500;
 const NUM_TIMESTEPS_2DAY: f64 = 2880.0 / DEFAULT_TIMESTEP;
+const NUM_TIMESTEPS_7DAY: f64 = 7.0 * 1440.0 / DEFAULT_TIMESTEP;
 
 // cross-presentation parameters
 
 
 // the main function which coordinates all the activities of the model
 fn main() {
-    return simulation(NUM_TIMESTEPS_2DAY.round() as u32, DEFAULT_TIMESTEP, NUM_TIME_MEASUREMENTS, DEFAULT_RADIUS, DEFAULT_CONTACT_RADIUS, TOTAL_TNUM.round() as u32)
+    let args: Vec<String> = env::args().collect();
+    let ag_on_arrival:f64 = args[1].parse().unwrap();
+    let off_rate:f64 = args[2].parse().unwrap();
+    let contact_radius_sq:f64 = args[3].parse().unwrap();
+    let dc_flux: f64 = args[4].parse().unwrap();
+    let t_cell_velocity: f64 = args[5].parse().unwrap();
+    let t_free_path: f64 = args[6].parse().unwrap();
+    let t_act_threshold: f64 = args[7].parse().unwrap();
+
+    return simulation(NUM_TIMESTEPS_7DAY.round() as u32, DEFAULT_TIMESTEP, dc_flux, DEFAULT_RADIUS, contact_radius_sq.sqrt(), TOTAL_TNUM.round() as u32, ag_on_arrival, off_rate, t_cell_velocity, t_free_path, t_act_threshold.round() as u32)
 }
 
-fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, radius: f64, contact_radius: f64, num_t_cells: u32) {
+fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, contact_radius: f64, num_t_cells: u32, ag_on_arrival:f64, off_rate:f64, t_cell_velocity:f64, t_free_path:f64, t_act_threshold:u32) {
 
     // creating the variables we need
     let mut total_num_activated: u32 = 0;
     let mut _total_num_unique_interactions: u32 = 0;
     let mut total_num_interactions: u32 = 0;
-    let cog_ag_on_arrival: f64 = DEFAULT_COGNATE_RATIO_MEAN_AT_DERMIS*f64::exp(-DEFAULT_ANTIGEN_DECAY_RATE*FIRST_DC_ARRIVAL);
-    let num_d_cells: u32 = (2880.0*DC_FLUX) as u32;
+    let cog_ag_on_arrival: f64 = ag_on_arrival;
+    let num_d_cells: u32 = (2880.0*dc_flux) as u32;
     
     // we must first make containers of dCells and tCells
     let mut d_cell_list = Vec::new();
@@ -94,7 +105,7 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
     // more containers for T cells
     let mut cell_movement_order: Vec<u32> = Vec::with_capacity(num_t_cells as usize);
     let mut free_path_remaining: Vec<f64> = vec![0.0; num_t_cells as usize];
-    let time_steps_betwee_dc_arrival: f64 = (DC_ARRIVAL_DURATION/time_step)/(num_d_cells - 1) as f64;
+    let _time_steps_between_dc_arrival: f64 = (DC_ARRIVAL_DURATION/time_step)/(num_d_cells - 1) as f64;
 
     for repeat in 0..NUM_REPEATS {
         // reinitialise number of activated t-cells and the positions of DCs
@@ -147,7 +158,7 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
             // }
 
             // spawning function for flux model
-            while t as f64*time_step*DC_FLUX >= (d_cells_present % num_d_cells + 1) as f64 { // we haven't got as many DCs as we should, better add one   
+            while t as f64*time_step*dc_flux >= (d_cells_present % num_d_cells + 1) as f64 { // we haven't got as many DCs as we should, better add one   
             let dloc = d_cells_present % num_d_cells; // dloc is the position in the d_cell_list we will be adding/removing
             if d_cells_present > num_d_cells {
                 functions::functions::remove_dc_from_discrete_grid(d_cell_list[dloc as usize].x, d_cell_list[dloc as usize].y, d_cell_list[dloc as usize].z, dloc, radius, cell_side, &mut occupied_positions, num_positions); // get rid of old DC that was here!
@@ -179,7 +190,7 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
                 // see if we've left sphere or reached end of mean free path
                 if functions::functions::outside_sphere(newx, newy, newz, radius) {
                     // regenerate velocity to move t cell away from sphere surface
-                    let vmag = functions::functions::genrand_t_velocity(T_VELOCITY_MEAN, T_VELOCITY_STDEV);
+                    let vmag = functions::functions::genrand_t_velocity(t_cell_velocity, T_VELOCITY_STDEV);
                     let theta = functions::functions::genrand_uniform_pos().acos();
                     let phi = 6.283185307*functions::functions::genrand_uniform_pos();
                     let magsq = functions::functions::magnitude(x, y, z);
@@ -190,13 +201,13 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
                     let (v0, v1, v2) = functions::functions::arbitrary_axis_rotation(x, y, z, v0, v1, v2, phi);
                     //println!("{}", functions::functions::magnitude(v0, v1, v2));
                     t_cell_list[t_cell_num as usize].vx = v0; t_cell_list[t_cell_num as usize].vy = v1; t_cell_list[t_cell_num as usize].vz = v2;
-                    free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(T_FREE_PATH_MEAN, T_FREE_PATH_STDEV);
+                    free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(t_free_path, T_FREE_PATH_STDEV);
             
                     // finally, reverse previous step we tried to make and take a new one
                     newx += v0*time_step - dx; newy += v1*time_step - dy; newz += v2*time_step - dz;
                 }
                 else if free_path_remaining[t_cell_num as usize] <= 0.0 {
-                    let vmag = functions::functions::genrand_t_velocity(T_VELOCITY_MEAN, T_VELOCITY_STDEV);
+                    let vmag = functions::functions::genrand_t_velocity(t_cell_velocity, T_VELOCITY_STDEV);
                     let theta = functions::functions::genrand_uniform_pos().acos();
                     let phi = 6.283185307*functions::functions::genrand_uniform_pos();
                     t_cell_list[t_cell_num as usize].vx = vmag*theta.sin()*phi.cos(); 
@@ -204,18 +215,18 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
                     t_cell_list[t_cell_num as usize].vz = vmag*theta.cos();
                     //println!("{}", functions::functions::magnitude(t_cell_list[t_cell_num as usize].vx, t_cell_list[t_cell_num as usize].vy, t_cell_list[t_cell_num as usize].vz));
                     //println!("{}, {}, {}", t_cell_list[t_cell_num as usize].vx, t_cell_list[t_cell_num as usize].vy, t_cell_list[t_cell_num as usize].vz);
-                    free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(T_FREE_PATH_MEAN, T_FREE_PATH_STDEV);
+                    free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(t_free_path, T_FREE_PATH_STDEV);
                 }
 
                 // check for DCs nearby to activate t cell and either update position or remove from simulation
                 let (d_cell_num, in_contact) = functions::functions::check_contact_with_dendrites_t(newx, newy, newz, radius, cell_side, num_positions, &occupied_positions, &d_cell_list, contact_radius, &t_cell_list[t_cell_num as usize].failed_dc_contact);
                 if in_contact {
-                    d_cell_list[d_cell_num as usize].cog_ag_ratio *= f64::exp(-((t as f64 * time_step) - d_cell_list[d_cell_num as usize].time_antigen_count_last_updated) * DEFAULT_ANTIGEN_DECAY_RATE);
+                    d_cell_list[d_cell_num as usize].cog_ag_ratio *= f64::exp(-((t as f64 * time_step) - d_cell_list[d_cell_num as usize].time_antigen_count_last_updated) * off_rate);
                     let (d_coord_x, d_coord_y, d_coord_z) = functions::functions::set_coordinates(d_cell_list[d_cell_num as usize].x, d_cell_list[d_cell_num as usize].y, d_cell_list[d_cell_num as usize].z, radius, cell_side);
                     //println!("{}, {}", t_cell_num, d_cell_num);
                     this_num_interactions += 1;
                     //println!("Time is {}, Ratio is {}", t as f64*time_step, d_cell_list[d_cell_num as usize].cog_ag_ratio);
-                    if rand::random::<f64>() < functions::functions::get_prob_activation(NUM_ANTIGEN_IN_CONTACT_AREA, NUM_ANTIGEN_ON_DC, TCELL_ACTIVATION_THRESHOLD, d_cell_list[d_cell_num as usize].cog_ag_ratio) {
+                    if rand::random::<f64>() < functions::functions::get_prob_activation(NUM_ANTIGEN_IN_CONTACT_AREA, NUM_ANTIGEN_ON_DC, t_act_threshold, d_cell_list[d_cell_num as usize].cog_ag_ratio) {
                         // activation! We no longer need to track this T cell. Erase it and pull the iterator back one
                         assert_eq!(cell_movement_order.remove(cell - pull_backs), t_cell_num);
                         pull_backs += 1; // we have to pull back the iterator so we don't skip any cells
@@ -232,7 +243,7 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
                         // activation failed - mark this pair so that they won't repeatedly try to interact
                         t_cell_list[t_cell_num as usize].failed_dc_contact.push(d_cell_num);
                         // regenerate velocity to move t cell away from DC after interaction
-                        let vmag = functions::functions::genrand_t_velocity(T_VELOCITY_MEAN, T_VELOCITY_STDEV);
+                        let vmag = functions::functions::genrand_t_velocity(t_cell_velocity, T_VELOCITY_STDEV);
                         let theta = functions::functions::genrand_uniform_pos().acos();
                         let phi = 6.283185307*functions::functions::genrand_uniform_pos();
                         x = newx - d_cell_list[d_cell_num as usize].x;
@@ -245,7 +256,7 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
                         let (v0, v1, v2) = functions::functions::arbitrary_axis_rotation(z, y, -x, v0, v1, v2, theta);
                         let (v0, v1, v2) = functions::functions::arbitrary_axis_rotation(x, y, z, v0, v1, v2, phi);
                         t_cell_list[t_cell_num as usize].vx = v0; t_cell_list[t_cell_num as usize].vy = v1; t_cell_list[t_cell_num as usize].vz = v2;
-                        free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(T_FREE_PATH_MEAN, T_FREE_PATH_STDEV);
+                        free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(t_free_path, T_FREE_PATH_STDEV);
                     }
                 }
                 t_cell_list[t_cell_num as usize].x = newx; t_cell_list[t_cell_num as usize].y = newy; t_cell_list[t_cell_num as usize].z = newz; 
@@ -253,16 +264,12 @@ fn simulation(num_time_steps: u32, time_step: f64, _num_time_measurements: u32, 
         } // end of time loop
         total_num_activated += this_num_activated;
         total_num_interactions += this_num_interactions;
-        println!("{}, {}", this_num_interactions, this_num_activated);
+        //println!("{}, {}", this_num_interactions, this_num_activated);
     } // end of repeat loop
-    println!("Total number of interactions: {}", total_num_interactions);
+    println!("{}    {}", total_num_interactions, total_num_activated);
     println!("Total number of activations: {}", total_num_activated);
 } // end of function
 // working perfectly with gaussian velocities as of 28/1/21
-
-fn cross_presentation() {
-        
-}
 
 /* TO ADD:_
 [x] flux of DCs arriving -> also need DCs leaving at a floating rate

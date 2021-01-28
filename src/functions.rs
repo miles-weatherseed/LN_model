@@ -160,4 +160,13 @@ pub mod functions {
         let binom = Binomial::new(cog_ag_ratio, mhc_in_contact as u64).unwrap();
         return 1.0 - binom.cdf((threshold - 1) as f64)
     }
+    pub fn add_vectors(a: Vec<f64>, b: Vec<f64>) -> Vec<f64> {
+        let n = a.len() as u32;
+        let mut c = vec![0.0; n as usize];
+        for i in 0..n {
+            c[i as usize] = a[i as usize] + b[i as usize];
+        }
+        println!("{:?}", c);
+        c
+    }
 }
