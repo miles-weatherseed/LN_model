@@ -1,2 +1,0 @@
-870    0
-Total number of activations: 0

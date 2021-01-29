@@ -22,9 +22,6 @@ pub mod functions {
         pub failed_dc_contact: Vec<i32>,
         pub interactions: u32,
     }
-    pub fn add_one(x: u32) -> u32{
-        x + 1
-    }
     pub fn magnitude(a: f64, b:f64, c:f64) -> f64 {
         f64::sqrt(f64::powf(a, 2.0) + f64::powf(b, 2.0) + f64::powf(c, 2.0))
     }
@@ -69,9 +66,6 @@ pub mod functions {
         return (d_cell_num, in_contact)
     }
     pub fn place_t_cells(radius: f64, cell_side:f64, num_positions: u32, preoccupied_positions: &Vec<Vec<u32>>, d_cell_list: &Vec<DCell>, contact_radius: f64) -> (f64, f64, f64){
-        let mut in_contact: bool = false;
-        let mut d_cell_num: i32 = -1;
-        let mut x: f64; let mut y: f64; let mut z: f64;
         let (x, y, z) = loop {
             let (x, y, z) = generate_coords(radius);
             if outside_sphere(x, y, z, radius) {
@@ -83,9 +77,6 @@ pub mod functions {
         return (x, y, z);
     }
     pub fn place_d_cells(mdci: u32, radius: f64, cell_side:f64, num_positions: u32, preoccupied_positions: &mut Vec<Vec<u32>>, d_cell_list: &Vec<DCell>, contact_radius: f64) -> (f64, f64, f64){
-        let mut in_contact: bool = false;
-        let mut d_cell_num: i32 = -1;
-        let mut x: f64; let mut y: f64; let mut z: f64;
         let (x, y, z) = loop {
             let (x, y, z) = generate_coords(radius);
             if outside_sphere(x, y, z, radius) {
@@ -142,8 +133,8 @@ pub mod functions {
         rand::random::<f64>()
     }
     pub fn arbitrary_axis_rotation(ax_x: f64, ax_y: f64, ax_z: f64, vec_x: f64, vec_y: f64, vec_z: f64, angle: f64) -> (f64, f64, f64) {
-        let (mut res_x, mut res_y, mut res_z): (f64, f64, f64);
-        let mut rotation_matrix = (angle.cos() + ax_x*ax_x*(1.0 - angle.cos()), ax_x*ax_y*(1.0 - angle.cos()) - ax_z*angle.sin(), ax_x*ax_z*(1.0 - angle.cos()) + ax_y*angle.sin(),
+        let (res_x, res_y, res_z): (f64, f64, f64);
+        let rotation_matrix = (angle.cos() + ax_x*ax_x*(1.0 - angle.cos()), ax_x*ax_y*(1.0 - angle.cos()) - ax_z*angle.sin(), ax_x*ax_z*(1.0 - angle.cos()) + ax_y*angle.sin(),
         ax_x*ax_y*(1.0 - angle.cos()) + ax_z*angle.sin(), angle.cos() + ax_y*ax_y*(1.0 - angle.cos()), ax_y*ax_z*(1.0 - angle.cos()) - ax_x*angle.sin(),
         ax_x*ax_z*(1.0 - angle.cos()) - ax_y*angle.sin(), ax_y*ax_z*(1.0 - angle.cos()) + ax_x*angle.sin(), angle.cos() + ax_z*ax_z*(1.0 - angle.cos()));
         res_x = vec_x*&rotation_matrix.0 + vec_y*&rotation_matrix.1 + vec_z*&rotation_matrix.2;
@@ -166,7 +157,6 @@ pub mod functions {
         for i in 0..n {
             c[i as usize] = a[i as usize] + b[i as usize];
         }
-        println!("{:?}", c);
         c
     }
 }

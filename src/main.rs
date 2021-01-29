@@ -34,9 +34,6 @@ const NUM_TIME_MEASUREMENTS: u32 = 500;
 const NUM_TIMESTEPS_2DAY: f64 = 2880.0 / DEFAULT_TIMESTEP;
 const NUM_TIMESTEPS_28DAY: f64 = 28.0 * 1440.0 / DEFAULT_TIMESTEP;
 
-// cross-presentation parameters
-
-
 // the main function which coordinates all the activities of the model
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -146,17 +143,6 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
 
         for t in 0..num_time_steps {
 
-            //for i in 0..occupied_positions_array_size {occupied_positions[i as usize].clear()};
-            
-            // spawn new DCs
-            // while t as f64*time_step < DC_ARRIVAL_DURATION && t as f64>= d_cells_present as f64*time_steps_betwee_dc_arrival{
-            //     let d_cell_num: u32 = d_cells_present;
-            //     d_cell_list[d_cell_num as usize].time_antigen_count_last_updated = 0.0;
-            //     d_cell_list[d_cell_num as usize].cog_ag_ratio = cog_ag_on_arrival;
-            //     functions::functions::place_dc_on_discrete_grid(d_cell_list[d_cell_num as usize].x, d_cell_list[d_cell_num as usize].y, d_cell_list[d_cell_num as usize].z, d_cell_num, radius, cell_side, &mut occupied_positions, num_positions);
-            //     d_cells_present += 1;
-            // }
-
             // spawning function for flux model
             while t as f64*time_step*dc_flux >= d_cells_present as f64 { // we haven't got as many DCs as we should, better add one   
             let dloc = d_cells_present % num_d_cells; // dloc is the position in the d_cell_list we will be adding/removing
@@ -175,7 +161,6 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
 
             // move our t cells and apply boundary conditions
             let mut pull_backs = 0;
-            //if t%500==0{println!("{}, {}, {}", cell_movement_order[0], cell_movement_order[1], cell_movement_order[2])};
             for cell in 0..cell_movement_order.len() {
                 let t_cell_num = cell_movement_order[cell - pull_backs];
                 let mut x: f64 = t_cell_list[t_cell_num as usize].x; let mut y: f64 = t_cell_list[t_cell_num as usize].y; let mut z: f64 = t_cell_list[t_cell_num as usize].z;
@@ -199,7 +184,6 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
                     v0 = -vmag*x; v1 = -vmag*y; v2 = -vmag*z;
                     let (v0, v1, v2) = functions::functions::arbitrary_axis_rotation(z, y, -x, v0, v1, v2, theta);
                     let (v0, v1, v2) = functions::functions::arbitrary_axis_rotation(x, y, z, v0, v1, v2, phi);
-                    //println!("{}", functions::functions::magnitude(v0, v1, v2));
                     t_cell_list[t_cell_num as usize].vx = v0; t_cell_list[t_cell_num as usize].vy = v1; t_cell_list[t_cell_num as usize].vz = v2;
                     free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(t_free_path, T_FREE_PATH_STDEV);
             
@@ -213,8 +197,6 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
                     t_cell_list[t_cell_num as usize].vx = vmag*theta.sin()*phi.cos(); 
                     t_cell_list[t_cell_num as usize].vy = vmag*theta.sin()*phi.sin(); 
                     t_cell_list[t_cell_num as usize].vz = vmag*theta.cos();
-                    //println!("{}", functions::functions::magnitude(t_cell_list[t_cell_num as usize].vx, t_cell_list[t_cell_num as usize].vy, t_cell_list[t_cell_num as usize].vz));
-                    //println!("{}, {}, {}", t_cell_list[t_cell_num as usize].vx, t_cell_list[t_cell_num as usize].vy, t_cell_list[t_cell_num as usize].vz);
                     free_path_remaining[t_cell_num as usize] = functions::functions::genrand_t_freepath(t_free_path, T_FREE_PATH_STDEV);
                 }
 
@@ -222,21 +204,11 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
                 let (d_cell_num, in_contact) = functions::functions::check_contact_with_dendrites_t(newx, newy, newz, radius, cell_side, num_positions, &occupied_positions, &d_cell_list, contact_radius, &t_cell_list[t_cell_num as usize].failed_dc_contact);
                 if in_contact {
                     d_cell_list[d_cell_num as usize].cog_ag_ratio *= f64::exp(-((t as f64 * time_step) - d_cell_list[d_cell_num as usize].time_antigen_count_last_updated) * off_rate);
-                    let (d_coord_x, d_coord_y, d_coord_z) = functions::functions::set_coordinates(d_cell_list[d_cell_num as usize].x, d_cell_list[d_cell_num as usize].y, d_cell_list[d_cell_num as usize].z, radius, cell_side);
-                    //println!("{}, {}", t_cell_num, d_cell_num);
                     this_num_interactions += 1;
-                    //println!("Time is {}, Ratio is {}", t as f64*time_step, d_cell_list[d_cell_num as usize].cog_ag_ratio);
                     if rand::random::<f64>() < functions::functions::get_prob_activation(NUM_ANTIGEN_IN_CONTACT_AREA, NUM_ANTIGEN_ON_DC, t_act_threshold, d_cell_list[d_cell_num as usize].cog_ag_ratio) {
                         // activation! We no longer need to track this T cell. Erase it and pull the iterator back one
                         assert_eq!(cell_movement_order.remove(cell - pull_backs), t_cell_num);
                         pull_backs += 1; // we have to pull back the iterator so we don't skip any cells
-                        // instead we choose to respawn this t cell somewhere else to keep the density in the paracortex at the same level
-                        //let (xnew, ynew, znew)  = functions::functions::place_t_cells(radius, cell_side, num_positions, &occupied_positions, &d_cell_list, contact_radius);
-                        //t_cell_list[t_cell_num as usize].x = xnew;
-                        //t_cell_list[t_cell_num as usize].y = ynew;
-                        //t_cell_list[t_cell_num as usize].z = znew;
-                        //t_cell_list[t_cell_num as usize].failed_dc_contact = vec![-1];
-                        //free_path_remaining[t_cell_num as usize] = 0.0;
                         this_num_activated +=1 ;
                     }
                     else {
@@ -269,9 +241,7 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
     println!("{}    {}", total_num_interactions, total_num_activated);
     //println!("Total number of activations: {}", total_num_activated);
 } // end of function
-// working perfectly with gaussian velocities as of 28/1/21
 
 /* TO ADD:_
 [x] flux of DCs arriving -> also need DCs leaving at a floating rate
-[] cross-presentation model -> run once at beginning, should then have arrival values of all 5 peptides
 */
