@@ -56,6 +56,7 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
     let mut total_num_interactions: u32 = 0;
     let cog_ag_on_arrival: f64 = ag_on_arrival;
     let num_d_cells: u32 = (2880.0*dc_flux) as u32;
+    let mut n_successes: u32 = 0;
     
     // we must first make containers of dCells and tCells
     let mut d_cell_list = Vec::new();
@@ -236,9 +237,10 @@ fn simulation(num_time_steps: u32, time_step: f64, dc_flux:f64, radius: f64, con
         } // end of time loop
         total_num_activated += this_num_activated;
         total_num_interactions += this_num_interactions;
+        n_successes += (this_num_activated > 0) as u32;
         //println!("{}, {}", this_num_interactions, this_num_activated);
     } // end of repeat loop
-    println!("{}    {}", total_num_interactions, total_num_activated);
+    println!("{}    {}    {}", total_num_interactions, total_num_activated, n_successes);
     //println!("Total number of activations: {}", total_num_activated);
 } // end of function
 
